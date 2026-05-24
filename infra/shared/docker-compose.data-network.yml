@@ -1,0 +1,10 @@
+---
+# Declares the rossini-data bridge network.
+# Attach this network only to services that need direct access to the
+# shared Postgres cluster (n8n, chatwoot, future apps).
+# Services that do NOT use shared Postgres (e.g. GLPI with its own MySQL)
+# should NOT be attached to rossini-data.
+networks:
+  rossini-data:
+    name: ${DATA_NETWORK_NAME:-rossini-data}
+    driver: bridge

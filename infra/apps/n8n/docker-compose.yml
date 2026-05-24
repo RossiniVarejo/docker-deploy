@@ -32,8 +32,12 @@ services:
       - ${N8N_FILES_PATH:-/srv/docker-data/n8n/files}:/files
     networks:
       - rossini-shared
+      - rossini-data
 
 networks:
   rossini-shared:
     name: ${SHARED_NETWORK_NAME:-rossini-shared}
+    external: true
+  rossini-data:
+    name: ${DATA_NETWORK_NAME:-rossini-data}
     external: true

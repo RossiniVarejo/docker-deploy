@@ -4,6 +4,7 @@
 # Run via: ./rossini-runner.sh <action>
 include:
   - path: shared/docker-compose.network.yml
+  - path: shared/docker-compose.data-network.yml
   - path: shared/docker-compose.postgres.yml
   - path: reverse-proxy/docker-compose.yml
   - path: apps/glpi/docker-compose.yml

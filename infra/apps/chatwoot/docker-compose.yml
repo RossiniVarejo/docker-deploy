@@ -13,6 +13,7 @@ services:
       - chatwoot-storage:/app/storage
     networks:
       - rossini-shared
+      - rossini-data
 
   chatwoot-rails:
     <<: *base
@@ -37,4 +38,7 @@ volumes:
 networks:
   rossini-shared:
     name: ${SHARED_NETWORK_NAME:-rossini-shared}
+    external: true
+  rossini-data:
+    name: ${DATA_NETWORK_NAME:-rossini-data}
     external: true
