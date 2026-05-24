@@ -11,6 +11,10 @@ infra/apps/*/certs/*
 infra/reverse-proxy/certs/*
 !infra/reverse-proxy/certs/.gitkeep
 
+# Reverse-proxy runtime conf.d — files here are written by the runner at deploy time
+infra/reverse-proxy/conf.d/*
+!infra/reverse-proxy/conf.d/.gitkeep
+
 # n8n local artifacts that must not enter the repo
 infra/apps/n8n/plan/
 infra/apps/n8n/.claude/

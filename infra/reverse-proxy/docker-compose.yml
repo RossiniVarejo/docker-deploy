@@ -1,0 +1,43 @@
+---
+# Single shared reverse proxy for the entire Rossini stack.
+# - proxy-nginx publishes :80 and :443 for all apps.
+# - proxy-certbot handles TLS certificate issuance and renewal for all apps.
+# - conf.d/ is writable from the host; the runner copies the appropriate
+#   template (dev or ssl) into it and signals nginx to reload.
+services:
+  proxy-nginx:
+    image: nginx:${NGINX_VERSION:-1.27-alpine}
+    restart: ${RESTART:-unless-stopped}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./conf.d:/etc/nginx/conf.d:ro
+      - ./certs:/etc/nginx/certs:ro
+      - proxy-webroot:/var/www/certbot:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - rossini-shared
+
+  proxy-certbot:
+    image: certbot/certbot:latest
+    restart: "no"
+    volumes:
+      - proxy-webroot:/var/www/certbot
+      - proxy-letsencrypt:/etc/letsencrypt
+      - ./certs:/etc/nginx/certs
+    networks:
+      - rossini-shared
+
+volumes:
+  proxy-webroot:
+  proxy-letsencrypt:
+
+networks:
+  rossini-shared:
+    name: ${SHARED_NETWORK_NAME:-rossini-shared}
+    external: true

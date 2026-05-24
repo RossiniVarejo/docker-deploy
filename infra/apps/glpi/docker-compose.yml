@@ -1,4 +1,6 @@
 ---
+# GLPI app stack — no nginx/certbot here.
+# TLS termination and routing are handled by infra/reverse-proxy.
 services:
   glpi-db:
     image: mysql:${GLPI_MYSQL_VERSION:-8.4}
@@ -14,17 +16,7 @@ services:
       - ./mysql/my.cnf:/etc/mysql/conf.d/glpi.cnf:ro
       - ./scripts/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
     healthcheck:
-      test:
-        [
-          "CMD",
-          "mysqladmin",
-          "ping",
-          "-h",
-          "localhost",
-          "-u",
-          "root",
-          "--password=${MYSQL_ROOT_PASSWORD}",
-        ]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "--password=${MYSQL_ROOT_PASSWORD}"]
       interval: 15s
       timeout: 5s
       retries: 6
@@ -71,42 +63,7 @@ services:
     networks:
       - rossini-shared
 
-  glpi-nginx:
-    image: nginx:${NGINX_VERSION:-1.27-alpine}
-    restart: ${RESTART:-unless-stopped}
-    depends_on:
-      - glpi
-    ports:
-      - ${GLPI_HTTP_PORT:-8080}:80
-      - ${GLPI_HTTPS_PORT:-8443}:443
-    volumes:
-      - ${GLPI_NGINX_CONF_PATH:-./nginx/glpi.conf}:/etc/nginx/conf.d/default.conf:ro
-      - ${GLPI_CERTS_PATH:-./certs}:/etc/nginx/certs:ro
-      - ${GLPI_FILES_PATH:-/srv/docker-data/glpi/files}:/var/www/glpi/files:ro
-      - glpi-certbot-webroot:/var/www/certbot:ro
-    healthcheck:
-      test: [ "CMD", "wget", "-qO-", "http://localhost/ping" ]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-    networks:
-      - rossini-shared
-
-  glpi-certbot:
-    image: certbot/certbot:latest
-    restart: "no"
-    volumes:
-      - glpi-certbot-webroot:/var/www/certbot
-      - glpi-letsencrypt:/etc/letsencrypt
-      - ${GLPI_CERTS_PATH:-./certs}:/etc/nginx/certs
-    networks:
-      - rossini-shared
-
 networks:
   rossini-shared:
     name: ${SHARED_NETWORK_NAME:-rossini-shared}
     external: true
-
-volumes:
-  glpi-certbot-webroot:
-  glpi-letsencrypt:
