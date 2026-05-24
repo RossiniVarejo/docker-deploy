@@ -4,17 +4,17 @@
 # - Shared Postgres cluster supplies the database (no bundled postgres).
 # - Redis must be provided externally; set REDIS_URL in infra/apps/chatwoot/.env.
 # - Storage is mounted as a named volume.
-services:
-  base: &base
-    image: chatwoot/chatwoot:latest
-    env_file: .env
-    restart: ${RESTART:-unless-stopped}
-    volumes:
-      - chatwoot-storage:/app/storage
-    networks:
-      - rossini-shared
-      - rossini-data
+x-base: &base
+  image: chatwoot/chatwoot:latest
+  env_file: .env
+  restart: ${RESTART:-unless-stopped}
+  volumes:
+    - chatwoot-storage:/app/storage
+  networks:
+    - rossini-shared
+    - rossini-data
 
+services:
   chatwoot-rails:
     <<: *base
     environment:
