@@ -1,0 +1,30 @@
+# Secrets — never commit real .env files
+.env
+**/.env
+
+# Server-specific env overrides
+infra/shared/.env.server
+
+# TLS certificates (keep .gitkeep placeholders)
+infra/apps/*/certs/*
+!infra/apps/*/certs/.gitkeep
+infra/reverse-proxy/certs/*
+!infra/reverse-proxy/certs/.gitkeep
+
+# n8n local artifacts that must not enter the repo
+infra/apps/n8n/plan/
+infra/apps/n8n/.claude/
+infra/apps/n8n/workflows/
+
+# Evolution API — full upstream repo vendored; exclude build artefacts
+infra/apps/evolution-api/node_modules/
+infra/apps/evolution-api/dist/
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Editor
+.idea/
+*.swp
+*.swo
