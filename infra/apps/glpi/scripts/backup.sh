@@ -1,17 +1,27 @@
 #!/usr/bin/env bash
+# backup.sh — backup GLPI database (MySQL) and persistent files.
+#
+# Invoke directly or via: ./rossini-runner.sh backup glpi
+#
+# Database password is passed via MYSQL_PWD env var to avoid appearing
+# in ps output (safer than --password= on the command line).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
-ENV_FILE="${ROOT_DIR}/infra/shared/.env"
-COMPOSE_FILE="${ROOT_DIR}/infra/apps/glpi/docker-compose.yml"
 
-if [[ -f "${ENV_FILE}" ]]; then
-    set -a
-    # shellcheck disable=SC1090
-    source "${ENV_FILE}"
-    set +a
-fi
+# Load shared env, then GLPI env
+_load_env() {
+    local f="$1"
+    if [ -f "${f}" ]; then
+        set -a
+        # shellcheck disable=SC1090
+        source "${f}"
+        set +a
+    fi
+}
+_load_env "${ROOT_DIR}/infra/shared/.env"
+_load_env "${ROOT_DIR}/infra/apps/glpi/.env"
 
 BACKUP_DIR="${GLPI_BACKUP_PATH:-/srv/docker-data/glpi/backups}"
 DATE="$(date +%Y%m%d_%H%M%S)"
@@ -19,7 +29,6 @@ RETAIN_DAYS="${BACKUP_RETAIN_DAYS:-30}"
 DB_SERVICE="glpi-db"
 DB_NAME="${MYSQL_DATABASE:-glpi}"
 DB_USER="root"
-DB_PASSWORD="${MYSQL_ROOT_PASSWORD:-}"
 
 GLPI_FILES_PATH="${GLPI_FILES_PATH:-/srv/docker-data/glpi/files}"
 GLPI_PLUGINS_PATH="${GLPI_PLUGINS_PATH:-/srv/docker-data/glpi/plugins}"
@@ -29,7 +38,7 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
 mkdir -p "${BACKUP_DIR}"
 
-if [[ -z "${DB_PASSWORD}" ]]; then
+if [ -z "${MYSQL_ROOT_PASSWORD:-}" ]; then
     echo "ERROR: MYSQL_ROOT_PASSWORD is not set. Aborting." >&2
     exit 1
 fi
@@ -39,16 +48,19 @@ log "Starting GLPI backup (date: ${DATE}, retain: ${RETAIN_DAYS} days)..."
 DB_DUMP="${BACKUP_DIR}/glpi_db_${DATE}.sql.gz"
 log "Dumping database '${DB_NAME}' -> ${DB_DUMP}"
 
-docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T "${DB_SERVICE}" \
+# MYSQL_PWD is read by mysqldump automatically; avoids the password appearing
+# in process listings (ps, /proc) unlike --password=...
+docker exec \
+    -e MYSQL_PWD="${MYSQL_ROOT_PASSWORD}" \
+    "${DB_SERVICE}" \
     mysqldump \
         -u "${DB_USER}" \
-        --password="${DB_PASSWORD}" \
         --single-transaction \
         --routines \
         --triggers \
         --set-gtid-purged=OFF \
         "${DB_NAME}" \
-    | gzip > "${DB_DUMP}"
+| gzip > "${DB_DUMP}"
 
 log "Database dump complete."
 
@@ -68,4 +80,4 @@ log "Rotating backups older than ${RETAIN_DAYS} days..."
 find "${BACKUP_DIR}" -name "glpi_*.sql.gz" -mtime "+${RETAIN_DAYS}" -delete
 find "${BACKUP_DIR}" -name "glpi_*.tar.gz" -mtime "+${RETAIN_DAYS}" -delete
 
-log "Backup finished successfully."
+log "GLPI backup finished."
