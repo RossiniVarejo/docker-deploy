@@ -1,0 +1,13 @@
+---
+# Top-level compose file for the Rossini stack.
+# Uses Compose `include:` (v2.20+) to merge all service overlays.
+# Run via: ./rossini-runner.sh <action>
+include:
+  - path: shared/docker-compose.network.yml
+  - path: shared/docker-compose.postgres.yml
+  - path: reverse-proxy/docker-compose.yml
+  - path: apps/glpi/docker-compose.yml
+  - path: apps/n8n/docker-compose.yml
+  - path: apps/chatwoot/docker-compose.yml
+  # Uncomment when Evolution API overlay is ready:
+  # - path: ../infra/apps/evolution-api-overlay/docker-compose.rossini.yml
