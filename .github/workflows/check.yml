@@ -1,0 +1,49 @@
+name: check
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  compose-validate:
+    name: Validate compose config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bootstrap .env files from examples
+        run: |
+          cp infra/shared/.env.example   infra/shared/.env
+          cp infra/apps/glpi/.env.example  infra/apps/glpi/.env
+          cp infra/apps/n8n/.env.example   infra/apps/n8n/.env
+          cp infra/apps/chatwoot/.env.example infra/apps/chatwoot/.env
+          mkdir -p infra/reverse-proxy/conf.d
+          touch infra/reverse-proxy/conf.d/00-limits.conf
+
+      - name: docker compose config
+        run: |
+          docker compose \
+            --env-file infra/shared/.env \
+            --env-file infra/apps/glpi/.env \
+            --env-file infra/apps/n8n/.env \
+            -f infra/compose.yml \
+            --project-directory infra \
+            config -q
+
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Run shellcheck
+        run: |
+          shellcheck --severity=warning \
+            rossini-runner.sh \
+            prepare.sh \
+            push-remote.sh \
+            $(find infra -name '*.sh' | sort)
