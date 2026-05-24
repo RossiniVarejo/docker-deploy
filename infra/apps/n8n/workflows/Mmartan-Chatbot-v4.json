@@ -1,0 +1,1088 @@
+{
+  "name": "Mmartan-Chatbot-v4",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Mmartan Chatbot v4\n- Etapa 1: Boas-vindas & Triagem\n- Etapa 2.1: Acompanhar Pedido (com mock determinístico)\n- Estado em custom_attributes.step da conversa\n- Opções 2-6: stub → escala humano\n- Mock: último dígito do input → status",
+        "height": 280,
+        "width": 460,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [-60, -380],
+      "typeVersion": 1,
+      "id": "note-overview",
+      "name": "Note: Overview"
+    },
+    {
+      "parameters": {
+        "content": "## Env vars\n- CHATWOOT_BASE_URL\n- CHATWOOT_API_ACCESS_TOKEN\n- CHATWOOT_WEBHOOK_SECRET",
+        "height": 200,
+        "width": 320,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [440, -380],
+      "typeVersion": 1,
+      "id": "note-env",
+      "name": "Note: Env vars"
+    },
+    {
+      "parameters": {
+        "content": "## Welcome (sem step / completed)",
+        "height": 200,
+        "width": 600,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [1500, -380],
+      "typeVersion": 1,
+      "id": "note-welcome",
+      "name": "Note: Welcome"
+    },
+    {
+      "parameters": {
+        "content": "## Menu choice (1-6)",
+        "height": 600,
+        "width": 1300,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [1500, -140],
+      "typeVersion": 1,
+      "id": "note-menu",
+      "name": "Note: Menu choice"
+    },
+    {
+      "parameters": {
+        "content": "## Track order (Etapa 2.1)",
+        "height": 720,
+        "width": 1700,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [1200, 480],
+      "typeVersion": 1,
+      "id": "note-track",
+      "name": "Note: Track order"
+    },
+    {
+      "parameters": {
+        "content": "## Escalate compartilhado",
+        "height": 220,
+        "width": 1000,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [1900, 1220],
+      "typeVersion": 1,
+      "id": "note-escalate",
+      "name": "Note: Escalate"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "v4-mmartan-chatbot",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "id": "node-webhook",
+      "name": "Webhook",
+      "webhookId": "1a8d2c4e-5f60-4ab2-9d1e-7c3b8f4a9e02"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "auth-1",
+              "leftValue": "={{ $json.headers && $json.headers['x-webhook-token'] }}",
+              "rightValue": "={{ $env.CHATWOOT_WEBHOOK_SECRET }}",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [220, 0],
+      "id": "node-validate-auth",
+      "name": "ValidateAuth"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "fe-1",
+              "leftValue": "={{ $json.body.event }}",
+              "rightValue": "message_created",
+              "operator": { "type": "string", "operation": "equals" }
+            },
+            {
+              "id": "fe-2",
+              "leftValue": "={{ $json.body.message_type }}",
+              "rightValue": "incoming",
+              "operator": { "type": "string", "operation": "equals" }
+            },
+            {
+              "id": "fe-3",
+              "leftValue": "={{ ($json.body.sender && $json.body.sender.type) || '' }}",
+              "rightValue": "contact",
+              "operator": { "type": "string", "operation": "equals" }
+            },
+            {
+              "id": "fe-4",
+              "leftValue": "={{ $json.body.private === true }}",
+              "rightValue": "true",
+              "operator": { "type": "string", "operation": "notEquals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [440, 0],
+      "id": "node-filter-event",
+      "name": "FilterEvent"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "n-acc", "name": "accountId", "value": "={{ $json.body.account.id }}", "type": "number" },
+            { "id": "n-conv", "name": "conversationId", "value": "={{ $json.body.conversation.id }}", "type": "number" },
+            { "id": "n-cont", "name": "content", "value": "={{ ($json.body.content || '').toString().trim() }}", "type": "string" },
+            { "id": "n-step", "name": "step", "value": "={{ ($json.body.conversation.custom_attributes && $json.body.conversation.custom_attributes.step) || '' }}", "type": "string" },
+            { "id": "n-att", "name": "attempts", "value": "={{ Number(($json.body.conversation.custom_attributes && $json.body.conversation.custom_attributes.attempts) || 0) }}", "type": "number" },
+            { "id": "n-lab", "name": "labels", "value": "={{ ($json.body.conversation && $json.body.conversation.labels) || [] }}", "type": "array" },
+            { "id": "n-snd", "name": "senderId", "value": "={{ $json.body.sender && $json.body.sender.id }}", "type": "number" }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [660, 0],
+      "id": "node-normalize",
+      "name": "NormalizeInput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "ie-1",
+              "leftValue": "={{ $json.step }}",
+              "rightValue": "escalated",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [880, 0],
+      "id": "node-is-escalated",
+      "name": "IsEscalated"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1100, 600],
+      "id": "node-noop-escalated",
+      "name": "NoOpEscalated"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "ito-1",
+              "leftValue": "={{ $json.step }}",
+              "rightValue": "track-order:awaiting-id",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1100, 0],
+      "id": "node-is-track-order",
+      "name": "IsTrackOrder"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "imc-1",
+              "leftValue": "={{ $json.step }}",
+              "rightValue": "awaiting-menu-choice",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1320, 0],
+      "id": "node-is-menu-choice",
+      "name": "IsMenuChoice"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHATWOOT_BASE_URL }}/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/custom_attributes",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "api_access_token", "value": "={{ $env.CHATWOOT_API_ACCESS_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"custom_attributes\": {\n    \"step\": \"awaiting-menu-choice\",\n    \"attempts\": 0\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1540, -300],
+      "id": "node-set-state-welcome",
+      "name": "SetStateAwaitingMenu",
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHATWOOT_BASE_URL }}/api/v1/accounts/{{ $('NormalizeInput').item.json.accountId }}/conversations/{{ $('NormalizeInput').item.json.conversationId }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "api_access_token", "value": "={{ $env.CHATWOOT_API_ACCESS_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": {{ JSON.stringify(\"Olá! Seja bem-vindo(a) à Central de Experiência do Cliente da mmartan. Sou a assistente virtual e estou aqui para te ajudar.\\n\\nO que você precisa hoje?\\n1️⃣ Acompanhar pedido\\n2️⃣ Trocar ou devolver\\n3️⃣ Prazo de entrega\\n4️⃣ Produto com defeito\\n5️⃣ Informações sobre produto\\n6️⃣ Outro assunto\") }},\n  \"message_type\": \"outgoing\",\n  \"private\": false,\n  \"content_type\": \"text\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1760, -300],
+      "id": "node-send-welcome",
+      "name": "SendWelcomeMenu",
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "io1-1",
+              "leftValue": "={{ $json.content }}",
+              "rightValue": "1",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1540, 0],
+      "id": "node-is-option-one",
+      "name": "IsOptionOne"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHATWOOT_BASE_URL }}/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/custom_attributes",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "api_access_token", "value": "={{ $env.CHATWOOT_API_ACCESS_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"custom_attributes\": {\n    \"step\": \"track-order:awaiting-id\",\n    \"topic\": \"track-order\",\n    \"attempts\": 0\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1760, -80],
+      "id": "node-set-state-track",
+      "name": "SetStateTrackOrder",
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHATWOOT_BASE_URL }}/api/v1/accounts/{{ $('NormalizeInput').item.json.accountId }}/conversations/{{ $('NormalizeInput').item.json.conversationId }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "api_access_token", "value": "={{ $env.CHATWOOT_API_ACCESS_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": {{ JSON.stringify(\"Para consultar seu pedido, preciso de algumas informações. Por favor, informe o número do pedido (você o encontra no e-mail de confirmação) ou o CPF cadastrado.\") }},\n  \"message_type\": \"outgoing\",\n  \"private\": false,\n  \"content_type\": \"text\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1980, -80],
+      "id": "node-ask-order-id",
+      "name": "AskOrderId",
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            { "id": "io26-2", "leftValue": "={{ $json.content }}", "rightValue": "2", "operator": { "type": "string", "operation": "equals" } },
+            { "id": "io26-3", "leftValue": "={{ $json.content }}", "rightValue": "3", "operator": { "type": "string", "operation": "equals" } },
+            { "id": "io26-4", "leftValue": "={{ $json.content }}", "rightValue": "4", "operator": { "type": "string", "operation": "equals" } },
+            { "id": "io26-5", "leftValue": "={{ $json.content }}", "rightValue": "5", "operator": { "type": "string", "operation": "equals" } },
+            { "id": "io26-6", "leftValue": "={{ $json.content }}", "rightValue": "6", "operator": { "type": "string", "operation": "equals" } }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1760, 120],
+      "id": "node-is-option-2to6",
+      "name": "IsOptionTwoToSix"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHATWOOT_BASE_URL }}/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/labels",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "api_access_token", "value": "={{ $env.CHATWOOT_API_ACCESS_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"labels\": [\"escalado-stub\"]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1980, 60],
+      "id": "node-label-stub",
+      "name": "LabelEscalatedStub",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHATWOOT_BASE_URL }}/api/v1/accounts/{{ $('NormalizeInput').item.json.accountId }}/conversations/{{ $('NormalizeInput').item.json.conversationId }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "api_access_token", "value": "={{ $env.CHATWOOT_API_ACCESS_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": {{ JSON.stringify(\"Estamos preparando essa opção. Vou te conectar a um atendente humano que vai resolver isso agora. Aguarde um momento!\") }},\n  \"message_type\": \"outgoing\",\n  \"private\": false,\n  \"content_type\": \"text\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2200, 60],
+      "id": "node-send-stub",
+      "name": "SendStubMessage",
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHATWOOT_BASE_URL }}/api/v1/accounts/{{ $('NormalizeInput').item.json.accountId }}/conversations/{{ $('NormalizeInput').item.json.conversationId }}/custom_attributes",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "api_access_token", "value": "={{ $env.CHATWOOT_API_ACCESS_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"custom_attributes\": {\n    \"step\": \"escalated\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2420, 60],
+      "id": "node-set-state-escalated-stub",
+      "name": "SetStateEscalatedStub",
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHATWOOT_BASE_URL }}/api/v1/accounts/{{ $('NormalizeInput').item.json.accountId }}/conversations/{{ $('NormalizeInput').item.json.conversationId }}/toggle_status",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "api_access_token", "value": "={{ $env.CHATWOOT_API_ACCESS_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"open\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2640, 60],
+      "id": "node-reopen-stub",
+      "name": "ReopenStub",
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "ima-1", "name": "newAttempts", "value": "={{ Number($json.attempts || 0) + 1 }}", "type": "number" }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1980, 240],
+      "id": "node-incr-menu-attempts",
+      "name": "IncrementMenuAttempts"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHATWOOT_BASE_URL }}/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/custom_attributes",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "api_access_token", "value": "={{ $env.CHATWOOT_API_ACCESS_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"custom_attributes\": {\n    \"step\": \"awaiting-menu-choice\",\n    \"attempts\": {{ $json.newAttempts }}\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2200, 240],
+      "id": "node-set-menu-attempts",
+      "name": "SetMenuAttempts",
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "iam-1",
+              "leftValue": "={{ Number($json.newAttempts) }}",
+              "rightValue": 2,
+              "operator": { "type": "number", "operation": "gte" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2420, 240],
+      "id": "node-is-attempts-max-menu",
+      "name": "IsAttemptsMaxMenu"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHATWOOT_BASE_URL }}/api/v1/accounts/{{ $('NormalizeInput').item.json.accountId }}/conversations/{{ $('NormalizeInput').item.json.conversationId }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "api_access_token", "value": "={{ $env.CHATWOOT_API_ACCESS_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": {{ JSON.stringify(\"Não consegui entender. Pode escolher uma das opções abaixo?\\n\\n1️⃣ Acompanhar pedido\\n2️⃣ Trocar ou devolver\\n3️⃣ Prazo de entrega\\n4️⃣ Produto com defeito\\n5️⃣ Informações sobre produto\\n6️⃣ Outro assunto\") }},\n  \"message_type\": \"outgoing\",\n  \"private\": false,\n  \"content_type\": \"text\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2640, 340],
+      "id": "node-resend-menu",
+      "name": "ResendMenu",
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = ($input.first().json.content || '').toString().trim();\nconst digits = raw.replace(/\\D/g, '');\nconst last = digits.slice(-1);\n\nlet status, extra = {};\nswitch (last) {\n  case '0':\n    status = 'cancelado';\n    extra = { refund_method: 'Cartão de crédito final 4321', refund_days: 7 };\n    break;\n  case '1':\n    status = 'em_separacao';\n    extra = { days_to_ship: 3 };\n    break;\n  case '2':\n    status = 'em_transito';\n    extra = { tracking_code: 'BR123456789BR', carrier: 'Correios', delivery_date: '2026-05-28' };\n    break;\n  case '3':\n    status = 'entregue';\n    extra = { delivery_date: '2026-05-18' };\n    break;\n  default:\n    status = 'not_found';\n}\n\nreturn [{\n  json: {\n    status,\n    order_number: raw || 'N/A',\n    raw_input: raw,\n    accountId: $input.first().json.accountId,\n    conversationId: $input.first().json.conversationId,\n    attempts: $input.first().json.attempts,\n    content: raw,\n    ...extra,\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 700],
+      "id": "node-mock-lookup",
+      "name": "MockOrderLookup"
+    },
+    {
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+                "conditions": [
+                  { "id": "sw-sep", "leftValue": "={{ $json.status }}", "rightValue": "em_separacao", "operator": { "type": "string", "operation": "equals" } }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "em_separacao"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+                "conditions": [
+                  { "id": "sw-tra", "leftValue": "={{ $json.status }}", "rightValue": "em_transito", "operator": { "type": "string", "operation": "equals" } }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "em_transito"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+                "conditions": [
+                  { "id": "sw-ent", "leftValue": "={{ $json.status }}", "rightValue": "entregue", "operator": { "type": "string", "operation": "equals" } }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "entregue"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+                "conditions": [
+                  { "id": "sw-can", "leftValue": "={{ $json.status }}", "rightValue": "cancelado", "operator": { "type": "string", "operation": "equals" } }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "cancelado"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+                "conditions": [
+                  { "id": "sw-nf", "leftValue": "={{ $json.status }}", "rightValue": "not_found", "operator": { "type": "string", "operation": "equals" } }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "not_found"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [1540, 700],
+      "id": "node-switch-status",
+      "name": "SwitchOrderStatus"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHATWOOT_BASE_URL }}/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "api_access_token", "value": "={{ $env.CHATWOOT_API_ACCESS_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": {{ JSON.stringify(`Seu pedido [#${$json.order_number}] está em separação no nosso centro de distribuição. A previsão de envio é em até ${$json.days_to_ship} dias úteis. Assim que o rastreio for gerado, você receberá por e-mail.`) }},\n  \"message_type\": \"outgoing\",\n  \"private\": false,\n  \"content_type\": \"text\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1780, 540],
+      "id": "node-send-separation",
+      "name": "SendSeparationMsg",
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHATWOOT_BASE_URL }}/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "api_access_token", "value": "={{ $env.CHATWOOT_API_ACCESS_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": {{ JSON.stringify(`Seu pedido já foi despachado! Código de rastreio: ${$json.tracking_code} — você pode acompanhar em ${$json.carrier}. Previsão de entrega: ${$json.delivery_date}.`) }},\n  \"message_type\": \"outgoing\",\n  \"private\": false,\n  \"content_type\": \"text\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1780, 660],
+      "id": "node-send-tracking",
+      "name": "SendTrackingMsg",
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHATWOOT_BASE_URL }}/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "api_access_token", "value": "={{ $env.CHATWOOT_API_ACCESS_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": {{ JSON.stringify(`Nosso sistema indica que o pedido foi entregue em ${$json.delivery_date}. Tudo certo com a entrega? Se tiver qualquer problema, posso te ajudar.`) }},\n  \"message_type\": \"outgoing\",\n  \"private\": false,\n  \"content_type\": \"text\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1780, 780],
+      "id": "node-send-delivered",
+      "name": "SendDeliveredMsg",
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHATWOOT_BASE_URL }}/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "api_access_token", "value": "={{ $env.CHATWOOT_API_ACCESS_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": {{ JSON.stringify(`Identificamos que esse pedido foi cancelado. O reembolso foi processado para ${$json.refund_method} em até ${$json.refund_days} dias. Tem mais alguma dúvida?`) }},\n  \"message_type\": \"outgoing\",\n  \"private\": false,\n  \"content_type\": \"text\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1780, 900],
+      "id": "node-send-canceled",
+      "name": "SendCanceledMsg",
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHATWOOT_BASE_URL }}/api/v1/accounts/{{ $('NormalizeInput').item.json.accountId }}/conversations/{{ $('NormalizeInput').item.json.conversationId }}/custom_attributes",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "api_access_token", "value": "={{ $env.CHATWOOT_API_ACCESS_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"custom_attributes\": {\n    \"step\": \"completed\",\n    \"attempts\": 0\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2020, 720],
+      "id": "node-set-state-completed",
+      "name": "SetStateCompleted",
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "ita-1", "name": "newAttempts", "value": "={{ Number($json.attempts || 0) + 1 }}", "type": "number" }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1780, 1020],
+      "id": "node-incr-track-attempts",
+      "name": "IncrementTrackAttempts"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHATWOOT_BASE_URL }}/api/v1/accounts/{{ $json.accountId }}/conversations/{{ $json.conversationId }}/custom_attributes",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "api_access_token", "value": "={{ $env.CHATWOOT_API_ACCESS_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"custom_attributes\": {\n    \"step\": \"track-order:awaiting-id\",\n    \"topic\": \"track-order\",\n    \"attempts\": {{ $json.newAttempts }}\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2000, 1020],
+      "id": "node-set-track-attempts",
+      "name": "SetTrackAttempts",
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "iat-1",
+              "leftValue": "={{ Number($json.newAttempts) }}",
+              "rightValue": 2,
+              "operator": { "type": "number", "operation": "gte" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2220, 1020],
+      "id": "node-is-attempts-max-track",
+      "name": "IsAttemptsMaxTrack"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHATWOOT_BASE_URL }}/api/v1/accounts/{{ $('NormalizeInput').item.json.accountId }}/conversations/{{ $('NormalizeInput').item.json.conversationId }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "api_access_token", "value": "={{ $env.CHATWOOT_API_ACCESS_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": {{ JSON.stringify(\"Não localizei o pedido. Pode conferir o número do pedido ou seu CPF e enviar novamente?\") }},\n  \"message_type\": \"outgoing\",\n  \"private\": false,\n  \"content_type\": \"text\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2440, 1120],
+      "id": "node-ask-order-again",
+      "name": "AskOrderIdAgain",
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHATWOOT_BASE_URL }}/api/v1/accounts/{{ $('NormalizeInput').item.json.accountId }}/conversations/{{ $('NormalizeInput').item.json.conversationId }}/labels",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "api_access_token", "value": "={{ $env.CHATWOOT_API_ACCESS_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"labels\": [\"escalado-humano\"]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2020, 1280],
+      "id": "node-label-escalated",
+      "name": "LabelEscalated",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHATWOOT_BASE_URL }}/api/v1/accounts/{{ $('NormalizeInput').item.json.accountId }}/conversations/{{ $('NormalizeInput').item.json.conversationId }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "api_access_token", "value": "={{ $env.CHATWOOT_API_ACCESS_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": {{ JSON.stringify(\"Não consegui localizar esse pedido com as informações fornecidas. Vou te conectar com um atendente humano que vai resolver isso agora. Aguarde um momento!\") }},\n  \"message_type\": \"outgoing\",\n  \"private\": false,\n  \"content_type\": \"text\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2240, 1280],
+      "id": "node-send-escalation",
+      "name": "SendEscalationMsg",
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHATWOOT_BASE_URL }}/api/v1/accounts/{{ $('NormalizeInput').item.json.accountId }}/conversations/{{ $('NormalizeInput').item.json.conversationId }}/custom_attributes",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "api_access_token", "value": "={{ $env.CHATWOOT_API_ACCESS_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"custom_attributes\": {\n    \"step\": \"escalated\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2460, 1280],
+      "id": "node-set-state-escalated",
+      "name": "SetStateEscalated",
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CHATWOOT_BASE_URL }}/api/v1/accounts/{{ $('NormalizeInput').item.json.accountId }}/conversations/{{ $('NormalizeInput').item.json.conversationId }}/toggle_status",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "api_access_token", "value": "={{ $env.CHATWOOT_API_ACCESS_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"open\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [2680, 1280],
+      "id": "node-reopen-escalated",
+      "name": "ReopenEscalated",
+      "retryOnFail": true,
+      "maxTries": 3
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "ValidateAuth", "type": "main", "index": 0 }]]
+    },
+    "ValidateAuth": {
+      "main": [
+        [{ "node": "FilterEvent", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "FilterEvent": {
+      "main": [
+        [{ "node": "NormalizeInput", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "NormalizeInput": {
+      "main": [[{ "node": "IsEscalated", "type": "main", "index": 0 }]]
+    },
+    "IsEscalated": {
+      "main": [
+        [{ "node": "NoOpEscalated", "type": "main", "index": 0 }],
+        [{ "node": "IsTrackOrder", "type": "main", "index": 0 }]
+      ]
+    },
+    "IsTrackOrder": {
+      "main": [
+        [{ "node": "MockOrderLookup", "type": "main", "index": 0 }],
+        [{ "node": "IsMenuChoice", "type": "main", "index": 0 }]
+      ]
+    },
+    "IsMenuChoice": {
+      "main": [
+        [{ "node": "IsOptionOne", "type": "main", "index": 0 }],
+        [{ "node": "SetStateAwaitingMenu", "type": "main", "index": 0 }]
+      ]
+    },
+    "SetStateAwaitingMenu": {
+      "main": [[{ "node": "SendWelcomeMenu", "type": "main", "index": 0 }]]
+    },
+    "IsOptionOne": {
+      "main": [
+        [{ "node": "SetStateTrackOrder", "type": "main", "index": 0 }],
+        [{ "node": "IsOptionTwoToSix", "type": "main", "index": 0 }]
+      ]
+    },
+    "SetStateTrackOrder": {
+      "main": [[{ "node": "AskOrderId", "type": "main", "index": 0 }]]
+    },
+    "IsOptionTwoToSix": {
+      "main": [
+        [{ "node": "LabelEscalatedStub", "type": "main", "index": 0 }],
+        [{ "node": "IncrementMenuAttempts", "type": "main", "index": 0 }]
+      ]
+    },
+    "LabelEscalatedStub": {
+      "main": [[{ "node": "SendStubMessage", "type": "main", "index": 0 }]]
+    },
+    "SendStubMessage": {
+      "main": [[{ "node": "SetStateEscalatedStub", "type": "main", "index": 0 }]]
+    },
+    "SetStateEscalatedStub": {
+      "main": [[{ "node": "ReopenStub", "type": "main", "index": 0 }]]
+    },
+    "IncrementMenuAttempts": {
+      "main": [[{ "node": "SetMenuAttempts", "type": "main", "index": 0 }]]
+    },
+    "SetMenuAttempts": {
+      "main": [[{ "node": "IsAttemptsMaxMenu", "type": "main", "index": 0 }]]
+    },
+    "IsAttemptsMaxMenu": {
+      "main": [
+        [{ "node": "LabelEscalated", "type": "main", "index": 0 }],
+        [{ "node": "ResendMenu", "type": "main", "index": 0 }]
+      ]
+    },
+    "MockOrderLookup": {
+      "main": [[{ "node": "SwitchOrderStatus", "type": "main", "index": 0 }]]
+    },
+    "SwitchOrderStatus": {
+      "main": [
+        [{ "node": "SendSeparationMsg", "type": "main", "index": 0 }],
+        [{ "node": "SendTrackingMsg", "type": "main", "index": 0 }],
+        [{ "node": "SendDeliveredMsg", "type": "main", "index": 0 }],
+        [{ "node": "SendCanceledMsg", "type": "main", "index": 0 }],
+        [{ "node": "IncrementTrackAttempts", "type": "main", "index": 0 }]
+      ]
+    },
+    "SendSeparationMsg": {
+      "main": [[{ "node": "SetStateCompleted", "type": "main", "index": 0 }]]
+    },
+    "SendTrackingMsg": {
+      "main": [[{ "node": "SetStateCompleted", "type": "main", "index": 0 }]]
+    },
+    "SendDeliveredMsg": {
+      "main": [[{ "node": "SetStateCompleted", "type": "main", "index": 0 }]]
+    },
+    "SendCanceledMsg": {
+      "main": [[{ "node": "SetStateCompleted", "type": "main", "index": 0 }]]
+    },
+    "IncrementTrackAttempts": {
+      "main": [[{ "node": "SetTrackAttempts", "type": "main", "index": 0 }]]
+    },
+    "SetTrackAttempts": {
+      "main": [[{ "node": "IsAttemptsMaxTrack", "type": "main", "index": 0 }]]
+    },
+    "IsAttemptsMaxTrack": {
+      "main": [
+        [{ "node": "LabelEscalated", "type": "main", "index": 0 }],
+        [{ "node": "AskOrderIdAgain", "type": "main", "index": 0 }]
+      ]
+    },
+    "LabelEscalated": {
+      "main": [[{ "node": "SendEscalationMsg", "type": "main", "index": 0 }]]
+    },
+    "SendEscalationMsg": {
+      "main": [[{ "node": "SetStateEscalated", "type": "main", "index": 0 }]]
+    },
+    "SetStateEscalated": {
+      "main": [[{ "node": "ReopenEscalated", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "v4-initial",
+  "meta": {
+    "instanceId": "49b8f97db4634d2152312ed6e2dd700a74410b32b267f0ac769908b14e69e499"
+  },
+  "id": "Mmartan-Chatbot-v4",
+  "tags": [
+    { "id": "FdJCJFE7vuZABz4A", "name": "whatsapp" },
+    { "id": "SmurBcO2ATi6vXie", "name": "chatwoot" },
+    { "id": "mmartan-tag", "name": "mmartan" },
+    { "id": "tol0Aje0nRKGf4xo", "name": "route" }
+  ]
+}

@@ -1,0 +1,35 @@
+---
+services:
+  postgres:
+    image: postgres:${POSTGRES_VERSION:-16-alpine}
+    restart: ${RESTART:-unless-stopped}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-zammad_production}
+      POSTGRES_USER: ${POSTGRES_USER:-zammad}
+      POSTGRES_PASSWORD: ${POSTGRES_PASS:?set POSTGRES_PASS in infra/shared/.env}
+      TZ: ${TZ:-America/Sao_Paulo}
+      PGTZ: ${TZ:-America/Sao_Paulo}
+      N8N_DB_NAME: ${N8N_DB_NAME:-n8n}
+      N8N_DB_USER: ${N8N_DB_USER:-n8n}
+      N8N_DB_PASSWORD: ${N8N_DB_PASSWORD:-}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-zammad} -d
+            ${POSTGRES_DB:-zammad_production}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    volumes:
+      - ${POSTGRES_DATA_PATH:-/srv/docker-data/postgres}:/var/lib/postgresql/data
+      - ./scripts/postgres-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - rossini-shared
+
+networks:
+  rossini-shared:
+    name: ${SHARED_NETWORK_NAME:-rossini-shared}
+    driver: bridge

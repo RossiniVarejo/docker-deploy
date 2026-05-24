@@ -1,0 +1,5 @@
+---
+networks:
+  rossini-shared:
+    name: ${SHARED_NETWORK_NAME:-rossini-shared}
+    driver: bridge
