@@ -1,0 +1,31 @@
+---
+# Rossini overlay for Evolution API.
+# Uses the official evoapicloud/evolution-api image and integrates with the
+# shared Postgres cluster and rossini-shared network.
+# The upstream source lives in a separate repository.
+services:
+  evolution-api:
+    image: evoapicloud/evolution-api:latest
+    restart: ${RESTART:-unless-stopped}
+    env_file:
+      - .env
+    environment:
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: >-
+        postgresql://${EVOLUTION_DB_USER:-evolution}:${EVOLUTION_DB_PASSWORD:?set EVOLUTION_DB_PASSWORD in infra/apps/evolution-api/.env}@postgres:5432/${EVOLUTION_DB_NAME:-evolution}
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: ${EVOLUTION_REDIS_URI:?set EVOLUTION_REDIS_URI in infra/apps/evolution-api/.env}
+      TZ: ${TZ:-America/Sao_Paulo}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ${EVOLUTION_INSTANCES_PATH:-/srv/docker-data/evolution/instances}:/evolution/instances
+    networks:
+      - rossini-shared
+
+networks:
+  rossini-shared:
+    name: ${SHARED_NETWORK_NAME:-rossini-shared}
+    external: true

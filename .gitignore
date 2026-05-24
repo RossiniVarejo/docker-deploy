@@ -16,9 +16,8 @@ infra/apps/n8n/plan/
 infra/apps/n8n/.claude/
 infra/apps/n8n/workflows/
 
-# Evolution API — full upstream repo vendored; exclude build artefacts
-infra/apps/evolution-api/node_modules/
-infra/apps/evolution-api/dist/
+# Evolution API — full upstream source lives in its own repo; exclude from this repo
+infra/apps/evolution-api/
 
 # macOS
 .DS_Store
