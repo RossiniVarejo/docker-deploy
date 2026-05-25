@@ -30,6 +30,11 @@ services:
     environment:
       GLPI_INSTALL_MODE: docker
       TZ: ${GLPI_TIMEZONE:-America/Sao_Paulo}
+      # Tell GLPI it is behind an SSL-terminating reverse proxy.
+      # GLPI reads GLPI_FORCE_SSL and PHP reads HTTPS=on to treat the
+      # session as secure even though the internal connection is plain HTTP.
+      GLPI_FORCE_SSL: "1"
+      HTTPS: "on"
     depends_on:
       glpi-db:
         condition: service_healthy
@@ -47,6 +52,8 @@ services:
     restart: ${RESTART:-unless-stopped}
     environment:
       TZ: ${GLPI_TIMEZONE:-America/Sao_Paulo}
+      GLPI_FORCE_SSL: "1"
+      HTTPS: "on"
     command: >
       sh -c "while true; do php /var/www/glpi/front/cron.php --force >>
       /var/log/glpi-cron.log 2>&1; sleep ${GLPI_CRON_INTERVAL_SECONDS:-60};
